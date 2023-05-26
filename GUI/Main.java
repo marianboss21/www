@@ -10,7 +10,14 @@ import javax.swing.JFrame;
 import javax.swing.JLayeredPane;
 import javax.swing.JPanel;
 
-import Simulator.CelestialBody;
+import GUI.Drawables.Background;
+import GUI.Drawables.Drawable;
+import GUI.Drawables.Planet;
+import GUI.Drawables.PlanetStats;
+import GUI.Drawables.Text;
+import GUI.Drawables.Trajectory;
+import GUI.Events.KeyEvents;
+import GUI.Events.MouseEvents;
 import Simulator.SolarSystem;
 import Simulator.State;
 
@@ -20,34 +27,46 @@ public class Main extends JPanel {
         frame.setExtendedState(JFrame.MAXIMIZED_BOTH);
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
+        /* The PHYSICS part */
+        SolarSystem solarSystem = new SolarSystem();
+        solarSystem.initialProcess();
+        GlobalState.states = solarSystem.getStates();
+
+        /*
+         * drawables represents any element, that will be drawed to the screen in each
+         * frame
+         */
         ArrayList<Drawable> drawables = new ArrayList<Drawable>();
 
-        /* TODO: Finish */
-
+        /* planetStats is a state of each celestial body, including the space probe */
         ArrayList<PlanetStats> planetStats = new ArrayList<PlanetStats>();
+        HelperFunctions.addPlanetsToDrawables(planetStats, drawables);
 
-        for (int i = 0; i <= 11; i++) {
-            planetStats.add(new PlanetStats(Values.NAMES[i], Values.SIZES[i], Values.COLORS[i]));
+        /* All the UI text on screen */
+        ArrayList<Text> uiTexts = new ArrayList<Text>();
+        HelperFunctions.createUIText(drawables, uiTexts);
 
-            drawables.add(new Planet(planetStats.get(i)));
-        }
+        /* Space Probe's trajectory */
+        Trajectory trajectoryMercury = new Trajectory(1);
+        Trajectory trajectoryVenus = new Trajectory(2);
+        Trajectory trajectoryEarth = new Trajectory(4);
+        Trajectory trajectoryMars = new Trajectory(5);
+        Trajectory trajectoryJupiter = new Trajectory(6);
+        Trajectory trajectorySaturn = new Trajectory(7);
+        Trajectory trajectorySpaceProbe = new Trajectory(11, true);
 
-        Text currentDateText = new Text(GlobalState.getCenter()[0], 40, true);
-        Text daysText = new Text(GlobalState.getCenter()[0], 70, true);
-        Text iText = new Text(100, 200);
-        Text simulationSpeed = new Text(0, 800);
-        Text nameFocusedPlanet = new Text(1100, 800);
-
-        drawables.add((Drawable) currentDateText);
-        drawables.add((Drawable) daysText);
-        drawables.add((Drawable) iText);
-        drawables.add((Drawable) simulationSpeed);
-        drawables.add((Drawable) nameFocusedPlanet);
+        drawables.add(trajectorySpaceProbe);
+        drawables.add(trajectoryMercury);
+        drawables.add(trajectoryVenus);
+        drawables.add(trajectoryEarth);
+        drawables.add(trajectoryMars);
+        drawables.add(trajectoryJupiter);
+        drawables.add(trajectorySaturn);
 
         drawables.add(new Background());
 
+        /* add all drawables to a panel */
         JLayeredPane layeredPane = new JLayeredPane();
-
         for (Drawable drawable : drawables) {
             drawable.setOpaque(true);
             drawable.setBounds(0, 0, GlobalState.FRAME_WIDTH, GlobalState.FRAME_HEIGHT);
@@ -58,58 +77,45 @@ public class Main extends JPanel {
         Collections.reverse(drawables);
 
         frame.add(layeredPane);
-
         frame.setVisible(true);
-
-        /*
-         * TODO:
-         * - Reintroduce focus
-         * - Reintroduce simulation speed
-         */
+        /* key and mouse events */
         frame.addMouseWheelListener(new MouseEvents());
         KeyEvents keyEvents = new KeyEvents(planetStats);
         frame.addKeyListener(keyEvents);
 
-        SolarSystem solarSystem = new SolarSystem();
-        solarSystem.initialProcess();
-
         int currStateIndex = 0;
-        State[] states = solarSystem.getStates();
-        int daysSinceStart = 0;
+        int daysSinceStart = (int) (GlobalState.STEP_MULTIPLIER * currStateIndex);
 
-        System.out.println("States ready ...");
-        System.out.println(states.length);
-
-        int[] currentDate = { 2023, 4, 1 };
         while (true) {
             if (GlobalState.paused) {
                 frame.repaint();
                 continue;
             }
-
             frame.repaint();
 
-            daysSinceStart = (int) (currStateIndex * 0.01); // No idea why 0.1 works, but it calculates days EXACTLY
-                                                            // Yoo, it's actually the step size multiplier
+            currStateIndex++;
+            daysSinceStart = (int) (currStateIndex * GlobalState.STEP_MULTIPLIER);
+
+            /* Neccessary to keep the focusedPlanet position up-to-date */
             keyEvents.setPlanetStats(planetStats);
 
+            /* Update all planets' positions */
             for (int i = 0; i <= 11; i++) {
-                planetStats.get(i).setPos((int) states[currStateIndex].state[i][0].getX(),
-                        (int) states[currStateIndex].state[i][0].getY());
+                planetStats.get(i).setPos((int) GlobalState.states[currStateIndex].state[i][0].getX(),
+                        (int) GlobalState.states[currStateIndex].state[i][0].getY());
             }
 
-            int[] currDate = Values.getDateFromDays(daysSinceStart);
+            trajectorySpaceProbe.updateCurrentStateIndex(currStateIndex);
 
-            currentDateText.setText(Values.MONTHS[currDate[1] % 12] + " " + (currDate[2] - 1) + ", " + currDate[0]);
-            daysText.setText("Days since start: " + daysSinceStart);
-            iText.setText("i: " + currStateIndex);
-            nameFocusedPlanet.setText("Focused planet: " + GlobalState.planetFocused.name);
+            /* Updating all UI text on screen */
+            int[] currDate = Values.daysPassedToDate(daysSinceStart);
+            uiTexts.get(0).setText(Values.MONTHS[currDate[1] - 1] + " " + (currDate[2]) + ", " + currDate[0]);
+            uiTexts.get(1).setText("Days since start: " + daysSinceStart);
+            uiTexts.get(2)
+                    .setText("Simulation speed: " + Math.ceil((10.00 / GlobalState.simulationSpeed) * 100) / 100 + "x");
+            uiTexts.get(3).setText("Focused planet: " + GlobalState.planetFocused.name);
 
-            double sSpeed = Math.ceil((10.00 / GlobalState.simulationSpeed) * 100) / 100;
-
-            simulationSpeed.setText("Simulation speed: " + sSpeed + "x");
-
-            currStateIndex++;
+            /* Determines the simulation speed */
             Thread.sleep(GlobalState.simulationSpeed);
         }
     }
