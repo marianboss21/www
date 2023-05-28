@@ -24,6 +24,7 @@ public class ODESolver implements IODESolver {
 
         // update positions of each planet for 1 step
         for (int i = 1; i < states.length; i++) {
+            //if statment, check the distance if the distance is smaller or equal to 300k 
             states[i] = (State) step(f, timestep[i], states[i - 1], (timestep[i] - timestep[i - 1]));
         }
         return states;
@@ -52,6 +53,7 @@ public class ODESolver implements IODESolver {
 
         // update positions of each planet for 1 step
         for (int i = 1; i < states.length; i++) {
+            //if statement for 300k as well
             states[i] = (State) step(f, timeStep[i], states[i - 1], (timeStep[i] - timeStep[i - 1]));
         }
 
